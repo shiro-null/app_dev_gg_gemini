@@ -1,0 +1,7 @@
+controller/
+├── context_optimizer.py          # Quản lý sliding window, tính token, phối hợp tóm tắt
+├── worker_threads.py             # Chứa toàn bộ QThread bất đồng bộ cho UI
+└── providers/
+    ├── base_provider.py          # Interface chung cho mọi LLM Engine
+    ├── gemini_provider.py        # Gọi API Gemini Cloud (xoay Key, count token)
+    └── local_summary_provider.py # Gọi AI Local (Ollama / Local GGUF) để tóm tắt
