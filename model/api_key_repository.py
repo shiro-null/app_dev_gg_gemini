@@ -1,7 +1,6 @@
 import sqlite3
 import datetime
 from typing import List, Dict, Any, Optional
-
 from model.database_connection import DatabaseConnection
 
 
@@ -48,16 +47,17 @@ class ApiKeyRepository:
         finally:
             database_connection.close()
 
-    def get_available_api_key(self) -> Optional[str]:
+    def get_available_api_key(self) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin API Key ít dùng nhất, trả về dict gồm id và api_key."""
         database_connection = self.database_connection.get_connection()
         try:
             database_cursor = database_connection.cursor()
             database_cursor.execute(
-                "SELECT api_key FROM project_api_keys ORDER BY usage_count ASC, id ASC LIMIT 1"
+                "SELECT id, api_key FROM project_api_keys ORDER BY usage_count ASC, id ASC LIMIT 1"
             )
             result_row = database_cursor.fetchone()
             if result_row:
-                return result_row["api_key"]
+                return dict(result_row)
             return None
         finally:
             database_connection.close()

@@ -116,6 +116,17 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_messages_fts USING fts5(
     content
 );
 
+-- 12. Quản lý danh sách File Context Picker theo Session (Kế bên khung Chat)
+CREATE TABLE IF NOT EXISTS session_file_references (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    is_active INTEGER DEFAULT 1,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES conversation_sessions(id) ON DELETE CASCADE
+);
+
 -- Triggers tự động đồng bộ Full-Text Search
 CREATE TRIGGER IF NOT EXISTS trg_session_messages_after_insert
 AFTER INSERT ON session_messages

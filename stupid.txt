@@ -1,32 +1,82 @@
 Folder PATH listing for volume New Volume
 Volume serial number is 804E-2504
 D:.
+¦   .gitignore
 ¦   main.py
+¦   README.md
 ¦   stupid.txt
 ¦   
++---config
+¦   ¦   logger_config.py
+¦   ¦   model_limits.py
+¦   ¦   
+¦   +---__pycache__
+¦           logger_config.cpython-312.pyc
+¦           model_limits.cpython-312.pyc
+¦           
 +---controller
 ¦   ¦   context_optimizer.py
+¦   ¦   file_loader.py
 ¦   ¦   gemini_api_service.py
+¦   ¦   rate_limit_manager.py
 ¦   ¦   worker_threads.py
 ¦   ¦   
 ¦   +---providers
-¦           base_provider.py
-¦           gemini_provider.py
-¦           local_summary_provider.py
-¦           tree.txt
+¦   ¦   ¦   base_provider.py
+¦   ¦   ¦   gemini_provider.py
+¦   ¦   ¦   local_summary_provider.py
+¦   ¦   ¦   tree.txt
+¦   ¦   ¦   
+¦   ¦   +---__pycache__
+¦   ¦           base_provider.cpython-312.pyc
+¦   ¦           gemini_provider.cpython-312.pyc
+¦   ¦           local_summary_provider.cpython-312.pyc
+¦   ¦           
+¦   +---__pycache__
+¦           context_optimizer.cpython-312.pyc
+¦           file_loader.cpython-312.pyc
+¦           gemini_api_service.cpython-312.pyc
+¦           rate_limit_manager.cpython-312.pyc
+¦           worker_threads.cpython-312.pyc
 ¦           
-+---model
-¦       api_key_repository.py
-¦       database_connection.py
-¦       database_manager.py
-¦       schema.sql
-¦       session_repository.py
-¦       user_memory_repository.py
++---Instruction
+¦       file&sumary.md
+¦       readme1.md
 ¦       
-+---ui
-¦   ¦   ui_main_workspace_window.py
++---log_runtime
+¦       app_runtime.log
+¦       error_runtime.log
+¦       
++---model
+¦   ¦   api_key_repository.py
+¦   ¦   app_data.db
+¦   ¦   database_connection.py
+¦   ¦   database_manager.py
+¦   ¦   schema.sql
+¦   ¦   session_repository.py
+¦   ¦   user_memory_repository.py
 ¦   ¦   
 ¦   +---__pycache__
+¦           api_key_repository.cpython-312.pyc
+¦           database_connection.cpython-312.pyc
+¦           database_manager.cpython-312.pyc
+¦           session_repository.cpython-312.pyc
+¦           user_memory_repository.cpython-312.pyc
+¦           
++---ui
+¦   ¦   api_worker.py
+¦   ¦   ui_main_workspace_window.py
+¦   ¦   
+¦   +---dialogs
+¦   ¦   ¦   api_key_manager_dialog.py
+¦   ¦   ¦   global_context_dialog.py
+¦   ¦   ¦   
+¦   ¦   +---__pycache__
+¦   ¦           api_key_manager_dialog.cpython-312.pyc
+¦   ¦           global_context_dialog.cpython-312.pyc
+¦   ¦           
+¦   +---__pycache__
+¦           api_worker.cpython-312.pyc
 ¦           ui_main_workspace_window.cpython-312.pyc
 ¦           
 +---venv

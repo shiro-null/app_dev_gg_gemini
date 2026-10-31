@@ -3,13 +3,35 @@ from google import genai
 from google.genai import types
 from google.genai.errors import APIError
 
-from model.api_key_repository import ApiKeyRepository
+from config.model_limits import MODEL_IDENTIFIER_MAPPING
 from controller.providers.base_provider import BaseLLMProvider
 
 
 class GeminiProvider(BaseLLMProvider):
-    def __init__(self, api_key_repository: ApiKeyRepository) -> None:
-        self.api_key_repository: ApiKeyRepository = api_key_repository
+    def __init__(self, api_key_repository: Any) -> None:
+        self.api_key_repository: Any = api_key_repository
+
+    def count_tokens(self, text_content: str, model_mode: str = "Tự động") -> int:
+        """Thực thi phương thức ảo count_tokens bắt buộc từ BaseLLMProvider."""
+        if not text_content or not text_content.strip():
+            return 0
+
+        if hasattr(self.api_key_repository, "get_available_api_key"):
+            api_key_data = self.api_key_repository.get_available_api_key()
+            if api_key_data and isinstance(api_key_data, dict) and api_key_data.get("api_key"):
+                try:
+                    target_model_identifier = MODEL_IDENTIFIER_MAPPING.get(model_mode, "gemini-2.5-flash")
+                    client_instance = genai.Client(api_key=api_key_data["api_key"])
+                    token_count_response = client_instance.models.count_tokens(
+                        model=target_model_identifier,
+                        contents=text_content
+                    )
+                    if hasattr(token_count_response, "total_tokens") and token_count_response.total_tokens:
+                        return token_count_response.total_tokens
+                except Exception:
+                    pass
+
+        return max(1, len(text_content) // 3)
 
     def generate_response(
         self,
@@ -17,10 +39,10 @@ class GeminiProvider(BaseLLMProvider):
         conversation_history: List[Dict[str, Any]],
         system_instruction: str = ""
     ) -> str:
-        response_text, _, _ = self.send_message(
+        response_text, _, _, _ = self.send_message(
             prompt_text=prompt_text,
             conversation_history=conversation_history,
-            mode="Tự động",
+            model_mode="Tự động",
             system_instruction=system_instruction,
             temperature=0.7
         )
@@ -30,68 +52,81 @@ class GeminiProvider(BaseLLMProvider):
         self,
         prompt_text: str,
         conversation_history: List[Dict[str, Any]],
-        mode: str = "Tự động",
+        model_mode: str = "Tự động",
         system_instruction: str = "",
         temperature: float = 0.7
-    ) -> Tuple[str, str, int]:
-        all_keys = self.api_key_repository.get_all_api_keys()
-        if not all_keys:
-            raise Exception("Chưa có API Key nào trong CSDL! Hãy thêm API Key ở cài đặt.")
+    ) -> Tuple[str, str, int, int]:
+        if hasattr(self.api_key_repository, "get_all_api_keys"):
+            all_api_keys = self.api_key_repository.get_all_api_keys()
+        else:
+            all_api_keys = []
 
-        keys_queue = [item["api_key"] for item in all_keys]
+        if not all_api_keys:
+            raise ValueError("Chưa có API Key nào trong cơ sở dữ liệu! Vui lòng thêm API Key trong cài đặt.")
 
-        # 1. MAP TÊN MODEL TỪ UI SANG MODEL ID CHUẨN CỦA GOOGLE API
-        model_map = {
-            "Agent Antigravity": "gemini-2.5-pro",
-            "gemma 26B": "gemma-2-27b-it",
-            "gemma 30B": "gemma-2-27b-it",
-            "Gemini 3.8 Flash TTS": "gemini-2.5-flash",
-            "Tự động": "gemini-2.5-flash"
-        }
-        chosen_model = model_map.get(mode, "gemini-2.5-flash")
+        target_model_identifier = MODEL_IDENTIFIER_MAPPING.get(model_mode, "gemini-2.5-flash")
 
-        # 2. DỰNG NỘI DUNG CHAT HISTORY + PROMPT
-        contents_payload = []
-        for msg in conversation_history:
-            role = "user" if msg["role"] == "user" else "model"
-            contents_payload.append({"role": role, "parts": [{"text": msg["content"]}]})
-        contents_payload.append({"role": "user", "parts": [{"text": prompt_text}]})
+        contents_payload: List[Dict[str, Any]] = []
+        for message_item in conversation_history:
+            role_name = "user" if message_item.get("role") == "user" else "model"
+            contents_payload.append({
+                "role": role_name,
+                "parts": [{"text": message_item.get("content", "")}]
+            })
+        
+        contents_payload.append({
+            "role": "user",
+            "parts": [{"text": prompt_text}]
+        })
 
-        # 3. ĐÓNG GÓI CONFIG (SYSTEM INSTRUCTION + TEMPERATURE)
-        request_config = types.GenerateContentConfig(
-            system_instruction=system_instruction if system_instruction.strip() else None,
+        request_configuration = types.GenerateContentConfig(
+            system_instruction=system_instruction.strip() if system_instruction and system_instruction.strip() else None,
             temperature=temperature
         )
 
-        last_exception = None
-        for current_key in keys_queue:
-            try:
-                client = genai.Client(api_key=current_key)
-                
-                # GỬI ĐẦY ĐỦ CONTENT + CONFIG LÊN SERVER GOOGLE
-                response = client.models.generate_content(
-                    model=chosen_model,
-                    contents=contents_payload,
-                    config=request_config
-                )
+        last_captured_exception: Exception | None = None
 
-                self.api_key_repository.increment_api_key_usage(current_key)
-                response_text = response.text if response.text else "Không nhận được phản hồi."
+        for api_key_data in all_api_keys:
+            if isinstance(api_key_data, dict):
+                current_api_key_value = api_key_data.get("api_key", "")
+                current_api_key_identifier = api_key_data.get("id", api_key_data.get("api_key_id", 0))
+            else:
+                current_api_key_value = str(api_key_data)
+                current_api_key_identifier = 0
 
-                # 4. LẤY TOKEN TRỰC TIẾP TỪ METADATA (KHÔNG CẦN GỌI API ĐẾM LẠI)
-                token_count = 0
-                if response.usage_metadata:
-                    token_count = response.usage_metadata.candidates_token_count or response.usage_metadata.total_token_count or 0
-
-                return response_text, chosen_model, token_count
-
-            except APIError as api_err:
-                if api_err.code == 429:
-                    last_exception = api_err
-                    continue
-                raise api_err
-            except Exception as err:
-                last_exception = err
+            if not current_api_key_value:
                 continue
 
-        raise Exception(f"Tất cả API Key đều bị lỗi! Chi tiết: {str(last_exception)}")
+            try:
+                client_instance = genai.Client(api_key=current_api_key_value)
+                
+                api_response = client_instance.models.generate_content(
+                    model=target_model_identifier,
+                    contents=contents_payload,
+                    config=request_configuration
+                )
+
+                if hasattr(self.api_key_repository, "increment_api_key_usage"):
+                    self.api_key_repository.increment_api_key_usage(current_api_key_value)
+
+                response_text = api_response.text if api_response.text else "Không nhận được phản hồi từ hệ thống."
+
+                total_token_count = 0
+                if api_response.usage_metadata:
+                    if api_response.usage_metadata.total_token_count:
+                        total_token_count = api_response.usage_metadata.total_token_count
+                    elif api_response.usage_metadata.candidates_token_count:
+                        total_token_count = api_response.usage_metadata.candidates_token_count
+
+                return response_text, target_model_identifier, total_token_count, current_api_key_identifier
+
+            except APIError as api_error:
+                last_captured_exception = api_error
+                if api_error.code == 429:
+                    continue
+                continue
+            except Exception as system_error:
+                last_captured_exception = system_error
+                continue
+
+        raise RuntimeError(f"Tất cả API Key đều không thể kết nối! Lỗi chi tiết: {str(last_captured_exception)}")

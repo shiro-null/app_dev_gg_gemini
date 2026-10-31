@@ -28,12 +28,13 @@ class DatabaseConnection:
         database_connection = sqlite3.connect(self.database_path)
         database_connection.row_factory = sqlite3.Row
         database_connection.execute("PRAGMA foreign_keys = ON;")
+        database_connection.execute("PRAGMA journal_mode = WAL;")  # Bật WAL Mode tăng tốc đọc ghi
+        database_connection.execute("PRAGMA synchronous = NORMAL;")
         return database_connection
 
     def initialize_database(self) -> None:
-        database_file_exists = os.path.exists(self.database_path)
-
-        if not database_file_exists:
+        # Chỉ thực thi script khởi tạo khi file DB thực sự chưa được tạo ra
+        if not os.path.exists(self.database_path):
             if not os.path.exists(self.schema_file_path):
                 raise FileNotFoundError(
                     f"Không tìm thấy file schema tại đường dẫn: {self.schema_file_path}"

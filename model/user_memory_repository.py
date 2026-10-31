@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from model.database_connection import DatabaseConnection
 
@@ -69,7 +69,7 @@ class UserMemoryRepository:
         finally:
             database_connection.close()
 
-    def get_formatted_global_context(self) -> str:
+    def get_formatted_global_context(self, summary_text: Optional[str] = None) -> str:
         system_instruction_text = self.get_system_instruction()
         user_memory_records = self.get_all_user_memories()
 
@@ -84,5 +84,8 @@ class UserMemoryRepository:
                 category_name = memory_item.get("memory_category", "")
                 content_text = memory_item.get("memory_content", "")
                 context_lines.append(f"- [{category_name}]: {content_text}")
+
+        if summary_text and summary_text.strip():
+            context_lines.append(f"\nTÓM TẮT BỘ NHỚ SESSION CŨ:\n{summary_text.strip()}")
 
         return "\n".join(context_lines)
