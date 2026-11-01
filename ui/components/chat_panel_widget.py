@@ -132,21 +132,30 @@ class ChatPanelWidget(QWidget):
         if not raw_text or not self.current_session_identifier:
             return
 
-        # Sửa dứt điểm lỗi gọi class cũ ở đây
         prompt_text = CodeCleaner.compress_code(raw_text) if self.compress_checkbox.isChecked() else raw_text
         active_files = self.active_file_paths_provider() if self.active_file_paths_provider else []
 
+        # 1. Lấy lịch sử hội thoại cũ từ CSDL TRƯỚC KHI lưu câu hỏi mới (để gửi sang API)
+        history_messages = self.database_manager.get_session_messages(self.current_session_identifier)
+
+        # 2. Ghi ngay tin nhắn của Người dùng vào CSDL SQLite
+        self.database_manager.add_message(
+            session_identifier=self.current_session_identifier,
+            role_name="user",
+            message_content=prompt_text
+        )
+
+        # 3. Hiển thị lên UI và dọn trống ô nhập
         self.chat_display.append(f"<b>[MÀY]:</b>\n{prompt_text}\n")
         self.input_text.clear()
 
-        history_messages = self.database_manager.get_session_messages(self.current_session_identifier)
         self.send_button.setEnabled(False)
         self.status_label.setText("Trạng thái: Đang xử lý ngầm...")
 
         self.worker_thread = ApiWorker(
             api_service=self.api_service,
             prompt_text=prompt_text,
-            conversation_history=history_messages[:-1],
+            conversation_history=history_messages,
             model_mode=self.model_combo.currentText(),
             session_identifier=self.current_session_identifier,
             active_file_paths=active_files,
@@ -158,6 +167,18 @@ class ChatPanelWidget(QWidget):
         self.worker_thread.start()
 
     def on_api_success(self, response_text: str, used_model: str, token_count: int, api_key_identifier: int, capacity_warning_message: str) -> None:
+        # 1. Ghi tin nhắn phản hồi của Bot vào CSDL SQLite
+        if self.current_session_identifier:
+            self.database_manager.add_message(
+                session_identifier=self.current_session_identifier,
+                role_name="model",
+                message_content=response_text,
+                total_tokens=token_count,
+                model_name=used_model,
+                api_key_id=api_key_identifier
+            )
+
+        # 2. Cập nhật UI hiển thị
         self.chat_display.append(f"<b>[BOT ({used_model})]:</b>\n{response_text}\n")
         self.status_label.setText(f"Trạng thái: Hoàn thành | Tokens: {token_count}")
         self.send_button.setEnabled(True)
