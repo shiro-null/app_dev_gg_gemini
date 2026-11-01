@@ -1,9 +1,10 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 from model.database_connection import DatabaseConnection
 from model.api_key_repository import ApiKeyRepository
 from model.session_repository import SessionRepository
 from model.user_memory_repository import UserMemoryRepository
+from model.rate_limit_repository import RateLimitRepository
 
 
 class DatabaseManager:
@@ -12,6 +13,7 @@ class DatabaseManager:
         self.api_key_repository = ApiKeyRepository(self.database_connection)
         self.session_repository = SessionRepository(self.database_connection)
         self.user_memory_repository = UserMemoryRepository(self.database_connection)
+        self.rate_limit_repository = RateLimitRepository(self.database_connection)
 
     # --- API KEY REPOSITORY METHODS ---
     def add_api_key(self, api_key_value: str, note_text: str = "") -> bool:
@@ -110,3 +112,37 @@ class DatabaseManager:
 
     def get_formatted_global_context(self) -> str:
         return self.user_memory_repository.get_formatted_global_context()
+
+    def get_formatted_global_context_for_session(self, session_identifier: Optional[int] = None) -> str:
+        summary_text = None
+        if session_identifier is not None:
+            summary_record = self.session_repository.get_session_summary(session_identifier)
+            if summary_record:
+                summary_text = summary_record.get("summary_text")
+                
+        return self.user_memory_repository.get_formatted_global_context(summary_text=summary_text)
+
+    # --- RATE LIMIT REPOSITORY METHODS ---
+    def log_model_request(
+        self,
+        api_key_id: int,
+        model_name: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        total_tokens: int = 0,
+        is_agent_request: bool = False
+    ) -> None:
+        self.rate_limit_repository.log_model_request(
+            api_key_id=api_key_id,
+            model_name=model_name,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            is_agent_request=is_agent_request
+        )
+
+    def get_current_rate_limits(self, api_key_id: int, model_name: str) -> Tuple[int, int, int]:
+        return self.rate_limit_repository.get_current_rate_limits(
+            api_key_id=api_key_id,
+            model_name=model_name
+        )
